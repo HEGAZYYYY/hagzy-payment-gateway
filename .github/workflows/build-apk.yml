@@ -1,11 +1,14 @@
-name: Build Android Payment Gateway
+name: Build & Release Android APK
 
 on:
   push:
     branches: [ main, master ]
-  pull_request:
-    branches: [ main, master ]
+    tags:
+      - 'v*'
   workflow_dispatch:
+
+permissions:
+  contents: write
 
 jobs:
   build:
@@ -28,11 +31,38 @@ jobs:
       - name: Run Unit Tests
         run: ./gradlew test --stacktrace
 
-      - name: Build Debug APK
-        run: ./gradlew assembleDebug --stacktrace
+      - name: Build Release APK
+        run: ./gradlew assembleRelease --stacktrace
+
+      - name: Rename APK for release
+        run: |
+          mkdir -p release-output
+          cp app/build/outputs/apk/release/*.apk release-output/HagzyPaymentGateway.apk
 
       - name: Upload APK Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: hagzy-payment-gateway-debug
-          path: app/build/outputs/apk/debug/*.apk
+          name: HagzyPaymentGateway-APK
+          path: release-output/HagzyPaymentGateway.apk
+
+      - name: Create GitHub Release with APK
+        uses: softprops/action-gh-release@v2
+        if: startsWith(github.ref, 'refs/tags/') || github.ref == 'refs/heads/main'
+        with:
+          tag_name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'latest' }}
+          name: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || 'Hagzy Payment Gateway Latest Release' }}
+          body: |
+            ### ⚡ Hagzy Payment Gateway (Android Daemon)
+            
+            Automated P2P mobile wallet & InstaPay payment confirmation daemon for Hagzy.
+            
+            #### 📥 Download:
+            Download **`HagzyPaymentGateway.apk`** below and install on the merchant listener phone.
+            
+            #### ⚙️ Quick Setup:
+            1. Install APK and grant **SMS Permissions** (`RECEIVE_SMS`, `READ_SMS`).
+            2. Enable **Notification Access** for Hagzy Gateway in Android Settings.
+            3. Set Battery Usage to **Unrestricted** (Ignore Battery Optimization).
+          files: release-output/HagzyPaymentGateway.apk
+          draft: false
+          prerelease: false
